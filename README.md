@@ -22,14 +22,13 @@ This project is built from scratch and relies on the following decoupled compone
 
 ## Environment Configuration
 
-Copy `backend/.env.example` to `backend/.env` and update your Ozone credentials:
+Copy `backend/.env.example` to `backend/.env` and update your Ozone credentials if necessary (defaults to local test credentials):
 ```env
 # Apache Ozone S3 Gateway Configuration
 MLFLOW_S3_ENDPOINT_URL=http://localhost:9878
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_ACCESS_KEY_ID=testuser
+AWS_SECRET_ACCESS_KEY=testuser-secret
 OZONE_BUCKET=ml-models
-MLFLOW_S3_IGNORE_TLS=true
 ```
 
 ## MLflow & Ozone Setup
@@ -55,7 +54,11 @@ mlflow server \
 2. Create and activate a virtual environment.
 3. Install dependencies: `pip install -r requirements.txt`.
 4. Run migrations: `python manage.py migrate`.
-5. Start the server: `python manage.py runserver`.
+5. Start the server (on Windows, enable UTF-8 to prevent MLflow console encoding errors):
+   ```powershell
+   $env:PYTHONUTF8="1"
+   python manage.py runserver 8000
+   ```
 
 ## Frontend Startup
 
@@ -85,7 +88,33 @@ Navigate to `http://localhost:3000` to view the application.
 4. `mlflow.pyfunc.log_model()` natively serializes the model and uses `boto3` to push the artifact directly to the Apache Ozone S3 Gateway.
 5. The model metadata and registered versions are stored in the MLflow SQLite database.
 
-### Prediction & Rollout
+### Automated Model Promotion Lifecycle
+
+Once a model is trained and registered in MLflow, the system supports a fully automated
+V1 → V2 → V3 canary promotion cycle:
+
+1. **Approve a model version** (`POST /api/v1/models/approve/`):
+   ```json
+   { "registered_name": "DummyModel", "version": "3" }
+   ```
+   - Sets the `"approved"` MLflow alias on the specified version.
+   - `LifecycleManager` immediately queries MLflow for the currently `"active"` version.
+   - If the approved version is **newer** than the active version, a canary rollout starts automatically.
+   - If no active version exists yet (first deployment), the approved version is promoted to `"active"` immediately.
+
+2. **Canary rollout** runs automatically via the `RolloutManager` timer:
+   - Traffic shifts from V1 (`active`) to V2 (`approved`) in configurable steps (default 10% every 5 s).
+   - Prediction errors from V2 are tracked against a threshold (default 20%).
+
+3. **Automatic promotion**: If V2 stays healthy at 100% traffic, `"active"` alias moves to V2 in MLflow. Future calls to `POST /api/v1/models/approve/` for V3 will automatically compare V3 against this new active version.
+
+4. **Automatic rollback**: If V2's error rate exceeds the threshold, traffic returns to V1 and V1 remains `"active"`.
+
+5. **Unapproved versions are ignored**: A model version without the `"approved"` alias will never replace the active model.
+
+> **Note:** The `"approved"` and `"active"` MLflow model aliases are stored in the MLflow SQLite database and survive server restarts. On startup, `LifecycleManager` re-checks for any pending promotions that occurred while the server was offline.
+
+### Prediction & Rollout (Legacy Manual Mode)
 1. A gradual rollout shifts traffic between a V1 model and a V2 model.
 2. The `RolloutManager` dynamically pulls the executable artifact natively from MLflow using `mlflow.pyfunc.load_model(model_uri)`.
 3. If the V2 model produces invalid results (error rate > 20%), an automatic rollback occurs.
@@ -106,7 +135,16 @@ aws s3 ls s3://ml-models/ --endpoint-url http://localhost:9878
 ```
 
 ## Tests
-Run the backend unit tests to verify API endpoints, routing, and rollback logic (MLflow is mocked locally during unit tests):
+Run the backend unit tests to verify API endpoints, routing, rollback logic, and lifecycle promotion (MLflow is mocked during unit tests):
 ```bash
 pytest backend/tests/
 ```
+
+Test modules:
+- `test_api_endpoints.py` — health and predict endpoints
+- `test_approve_endpoint.py` — POST /models/approve/ wiring
+- `test_lifecycle_manager.py` — promotion decision logic (7 scenarios)
+- `test_model_version_service.py` — MLflow alias/tag queries and writes
+- `test_rollout_manager.py` — canary steps, rollback, set_active on completion
+- `test_dummy_model.py` / `test_dummy_model_bad.py` — model implementations
+- `test_experiment_service.py` — MLflow experiment creation

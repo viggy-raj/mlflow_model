@@ -6,8 +6,7 @@ from ..interfaces.base_model import IModelBackend
 class DummyModelBad(IModelBackend):
     def __init__(self):
         self.weights = []
-        # Seeded random so the failure rate is deterministic for tests
-        self._rng = random.Random(42)
+        # Use unseeded random to prevent pickle from resetting state on every request
 
     def train(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -24,17 +23,17 @@ class DummyModelBad(IModelBackend):
         """
         Intentionally produces values outside [0, 1] about 40% of the time.
         """
-        if self._rng.random() < 0.40:
+        if random.random() < 0.40:
             # Produce an invalid prediction
-            return self._rng.choice([-1.5, -0.5, 1.5, 2.0])
-        
+            return random.choice([-1.5, -0.5, 1.5, 2.0])
+
         # Produce a valid prediction
-        return self._rng.uniform(0.0, 1.0)
+        return random.uniform(0.0, 1.0)
 
     def get_metadata(self) -> Dict[str, Any]:
         return {
-            "name": "DummyModelBad",
-            "version": "2.0-bad",
+            "name": "DummyModel",
+            "version": "bad-variant",
             "type": "invalid"
         }
 

@@ -11,4 +11,4 @@ def test_get_or_create_experiment(mock_mlflow):
     exp_id = service.get_or_create_experiment("test_exp")
     
     assert exp_id == "123"
-    mock_mlflow.create_experiment.assert_called_once_with("test_exp")
+    mock_mlflow.create_experiment.assert_called_once_with("test_exp", artifact_location='s3://ml-models/mlflow-artifacts')

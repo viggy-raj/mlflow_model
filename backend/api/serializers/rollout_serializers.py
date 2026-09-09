@@ -1,9 +1,11 @@
 from rest_framework import serializers
-from model_management.models import RolloutState
+from model_management.models import RolloutState, PredictionLog
 
 class RolloutStartSerializer(serializers.Serializer):
-    v1_model_type = serializers.CharField(max_length=100)
-    v2_model_type = serializers.CharField(max_length=100)
+    active_model_name = serializers.CharField(max_length=200, required=False)
+    active_mlflow_version = serializers.CharField(max_length=20, required=False)
+    canary_model_name = serializers.CharField(max_length=200, required=False)
+    canary_mlflow_version = serializers.CharField(max_length=20, required=False)
 
 class RolloutStateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -12,3 +14,8 @@ class RolloutStateSerializer(serializers.ModelSerializer):
 
 class PredictInputSerializer(serializers.Serializer):
     input_data = serializers.ListField(child=serializers.FloatField())
+
+class PredictionLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PredictionLog
+        fields = '__all__'

@@ -11,7 +11,9 @@ class ExperimentService:
     def get_or_create_experiment(self, name: str) -> str:
         experiment = mlflow.get_experiment_by_name(name)
         if experiment is None:
-            return mlflow.create_experiment(name)
+            bucket = getattr(settings, 'OZONE_BUCKET', 'ml-models')
+            artifact_location = f"s3://{bucket}/mlflow-artifacts"
+            return mlflow.create_experiment(name, artifact_location=artifact_location)
         return experiment.experiment_id
 
     def list_experiments(self) -> list:

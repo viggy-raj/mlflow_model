@@ -6,3 +6,6 @@ __pycache__/
 .DS_Store
 mlflow.db
 mlruns/
+*.sqlite3
+*.db
+backend/scratch/

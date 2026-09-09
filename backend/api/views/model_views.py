@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from model_management.services.experiment_service import ExperimentService
 from model_management.services.model_registry import ModelRegistry
-from ..serializers.model_serializers import ModelTrainSerializer
+from ..serializers.model_serializers import ModelTrainSerializer, ModelApproveSerializer
 
 class ModelListView(APIView):
     def get(self, request):
@@ -60,6 +60,16 @@ class ModelTrainView(APIView):
                         registered_model_name=metadata['name']
                     )
                     
+                    # 6. Set explicit CANDIDATE tag
+                    from mlflow.tracking import MlflowClient
+                    client = MlflowClient()
+                    client.set_model_version_tag(
+                        metadata['name'],
+                        model_info.registered_model_version,
+                        "lifecycle.status",
+                        "CANDIDATE"
+                    )
+                    
                 return Response({
                     "run_id": run_id,
                     "metrics": metrics,
@@ -82,3 +92,50 @@ class ActiveModelView(APIView):
         from model_management.services.rollout_manager import RolloutManager
         rm = RolloutManager.get_instance()
         return Response(rm.get_status())
+
+
+class ModelApproveView(APIView):
+    """
+    POST /api/v1/models/approve/
+
+    Marks a specific MLflow model version as 'approved', then immediately
+    checks whether a canary rollout should start (via LifecycleManager).
+
+    Request body:
+        { "registered_name": "DummyModel", "version": "3" }
+
+    Response:
+        Current rollout status dict (IDLE if no promotion was needed).
+    """
+    def post(self, request):
+        serializer = ModelApproveSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        registered_name = serializer.validated_data['registered_name']
+        version = serializer.validated_data['version']
+
+        try:
+            from model_management.services.model_version_service import ModelVersionService
+            from model_management.services.lifecycle_manager import LifecycleManager
+            from model_management.services.rollout_manager import RolloutManager
+
+            # 1. Stamp the approval marker in MLflow.
+            ModelVersionService.set_approved(registered_name, version)
+
+            # 2. Check if this approval should trigger a canary rollout.
+            LifecycleManager.get_instance().check_for_pending_promotion(registered_name)
+
+            # 3. Return the current rollout status so the caller can see what happened.
+            rm = RolloutManager.get_instance()
+            return Response({
+                "approved": {"registered_name": registered_name, "version": version},
+                "rollout": rm.get_status(),
+            }, status=status.HTTP_200_OK)
+
+        except Exception as exc:
+            import traceback
+            return Response(
+                {"error": str(exc), "traceback": traceback.format_exc()},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

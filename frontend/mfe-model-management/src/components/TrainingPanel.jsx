@@ -65,9 +65,6 @@ const TrainingPanel = () => {
         <button onClick={handleTrain} disabled={loading} style={{ padding: '0.5rem 1rem', cursor: 'pointer', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px' }}>
           {loading ? 'Processing...' : 'Train Model'}
         </button>
-        <button onClick={handleStartRollout} disabled={loading} style={{ padding: '0.5rem 1rem', cursor: 'pointer', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px' }}>
-          {loading ? 'Processing...' : 'Start Rollout (V1=dummy -> V2=selected)'}
-        </button>
       </div>
       
       {result && (
