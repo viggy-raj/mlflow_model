@@ -16,6 +16,21 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+#loading .env
+import os
+from dotenv import load_dotenv
+load_dotenv()
+REGISTER_MODEL = os.getenv('register_model', 'api/models/register/')
+LIST_MODELS = os.getenv('list_models', 'api/models/')
+
+# Set environment variables globally for boto3 (used by MLflow)
+if os.getenv("MINIO_ENDPOINT"):
+    os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("MINIO_ACCESS_KEY", "")
+    os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("MINIO_SECRET_KEY", "")
+    os.environ["MLFLOW_S3_ENDPOINT_URL"] = f"https://{os.getenv('MINIO_ENDPOINT')}"
+    os.environ["MLFLOW_S3_IGNORE_TLS"] = "true"
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 

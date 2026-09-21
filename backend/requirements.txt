@@ -1,0 +1,9 @@
+django
+mlflow
+python-dotenv
+torch
+onnx
+onnxruntime
+numpy
+pandas
+protobuf==3.20.3

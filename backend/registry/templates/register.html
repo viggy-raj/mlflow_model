@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MLflow Model Registry</title>
-    <meta name="description" content="Register your trained scikit-learn models directly into the MLflow Model Registry with a single click.">
+    <meta name="description" content="Register your trained PyTorch and ONNX models directly into the MLflow Model Registry.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -106,7 +106,7 @@
         /* ── Card ────────────────────────────────────────────────────────── */
         .card {
             width: 100%;
-            max-width: 580px;
+            max-width: 680px;
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-lg);
@@ -116,7 +116,18 @@
             animation: fadeUp 0.5s ease 0.1s both;
         }
 
+        .models-card {
+            max-width: 900px;
+            margin-top: 24px;
+        }
+
         /* ── Form elements ───────────────────────────────────────────────── */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
         .field {
             margin-bottom: 24px;
         }
@@ -131,7 +142,7 @@
             margin-bottom: 8px;
         }
 
-        input[type="text"] {
+        input[type="text"], input[type="number"], select, textarea {
             width: 100%;
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border);
@@ -143,13 +154,40 @@
             outline: none;
             transition: var(--transition);
         }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
 
-        input[type="text"]::placeholder { color: var(--text-muted); }
+        input[type="text"]::placeholder, input[type="number"]::placeholder, textarea::placeholder { color: var(--text-muted); }
 
-        input[type="text"]:focus {
+        input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
             border-color: var(--border-focus);
             background: rgba(99, 179, 237, 0.04);
             box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.12);
+        }
+
+        select option {
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+        }
+
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            text-transform: none;
+            letter-spacing: normal;
+            color: var(--text-primary);
+            cursor: pointer;
+            margin-bottom: 0;
+            gap: 8px;
+        }
+
+        .checkbox-label input {
+            cursor: pointer;
         }
 
         /* ── Drag-and-drop upload zone ───────────────────────────────────── */
@@ -260,6 +298,23 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: var(--accent-red);
+            border: 1px solid rgba(252, 129, 129, 0.4);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .btn-danger:hover {
+            background: rgba(252, 129, 129, 0.1);
+            border-color: var(--accent-red);
         }
 
         /* ── Spinner ─────────────────────────────────────────────────────── */
@@ -446,9 +501,9 @@
             padding: 11px 14px;
             color: var(--text-primary);
             border-bottom: 1px solid rgba(255,255,255,0.04);
-            font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
-            word-break: break-all;
+            word-break: break-word;
+            vertical-align: middle;
         }
         .models-table tr:last-child td { border-bottom: none; }
         .models-table tr:hover td { background: rgba(255,255,255,0.02); }
@@ -498,52 +553,107 @@
             MLflow Model Registry
         </div>
         <h1>Register a Model</h1>
-        <p>Upload a trained <code>.pkl</code> model to log and register it via MLflow.</p>
+        <p>Upload a trained <code>.pt</code> or <code>.onnx</code> model to log and register it via MLflow.</p>
     </header>
 
     <!-- ── Registration card ──────────────────────────────────────────── -->
     <main class="card">
         <form id="registerForm" novalidate>
 
-            <!-- Model Name -->
+            <div class="grid-2">
+                <!-- Model Name -->
+                <div class="field">
+                    <label for="modelNameInput">Model Name</label>
+                    <input id="modelNameInput" type="text" name="model_name" placeholder="e.g. resnet_v1" autocomplete="off" required>
+                </div>
+                
+                <!-- Model Type -->
+                <div class="field">
+                    <label for="model_type">Model Type</label>
+                    <select id="model_type" name="model_type" required>
+                        <option value="">Select...</option>
+                        <option value="Speech">Speech</option>
+                        <option value="NER">NER</option>
+                        <option value="File Classifier">File Classifier</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Architecture -->
+                <div class="field">
+                    <label for="architecture">Architecture</label>
+                    <select id="architecture" name="architecture" required>
+                        <option value="">Select...</option>
+                        <option value="__ADD_NEW__">+ Add New Architecture</option>
+                    </select>
+                    <input type="text" id="new_architecture" name="new_architecture" placeholder="Enter new architecture" style="display:none; margin-top:10px;">
+                </div>
+                
+                <!-- Versioning -->
+                <div class="field">
+                    <label for="versioning">Versioning</label>
+                    <select id="versioning" name="versioning">
+                        <option value="Auto-increment">Auto-increment</option>
+                        <option value="Major">Major</option>
+                        <option value="Minor">Minor</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <!-- Accuracy -->
+                <div class="field">
+                    <label for="accuracy">Accuracy (0-100)</label>
+                    <input id="accuracy" type="number" step="0.1" min="0" max="100" name="accuracy" placeholder="e.g. 95.5" required>
+                </div>
+                
+                <!-- Priority -->
+                <div class="field">
+                    <label for="priority">Priority</label>
+                    <input id="priority" type="number" name="priority" placeholder="e.g. 1" required>
+                </div>
+            </div>
+
+            <!-- Deployment Points -->
+            <div class="field" id="deployment_points_container" style="display:none;">
+                <label>Deployment Points</label>
+                <div id="deployment_points_list" style="display:flex; flex-wrap:wrap; gap:15px; margin-top:8px;">
+                </div>
+            </div>
+
             <div class="field">
-                <label for="modelNameInput">Model Name</label>
-                <input
-                    id="modelNameInput"
-                    type="text"
-                    name="model_name"
-                    placeholder="e.g. simple_classifier"
-                    autocomplete="off"
-                    required
-                >
+                <label class="checkbox-label">
+                    <input type="checkbox" id="is_deployable" name="is_deployable" value="true">
+                    Is Deployable?
+                </label>
+            </div>
+
+            <!-- Remarks -->
+            <div class="field">
+                <label for="remarks">Remarks</label>
+                <textarea id="remarks" name="remarks" placeholder="Add any notes here..."></textarea>
             </div>
 
             <!-- File Upload -->
             <div class="field">
-                <label>Model File <span style="color:var(--text-muted);text-transform:none;font-weight:400;">(.pkl)</span></label>
+                <label>Model File <span style="color:var(--text-muted);text-transform:none;font-weight:400;">(.pt or .onnx)</span></label>
 
                 <div class="drop-zone" id="dropZone">
                     <!-- Invisible real file input layered on top -->
-                    <input
-                        id="modelFileInput"
-                        type="file"
-                        name="model"
-                        accept=".pkl"
-                        required
-                        aria-label="Upload .pkl model file"
-                    >
+                    <input id="modelFileInput" type="file" name="model" accept=".pt,.onnx" required aria-label="Upload .pt or .onnx model file">
 
                     <!-- Default state (no file) -->
                     <div class="drop-zone-content">
                         <span class="drop-zone-icon">📦</span>
                         <div class="drop-zone-title">Drag & drop your model here</div>
-                        <div class="drop-zone-sub">or click to browse — .pkl files only</div>
+                        <div class="drop-zone-sub">or click to browse — .pt or .onnx files only</div>
                     </div>
 
                     <!-- File selected state -->
                     <div class="file-selected">
                         <span class="file-icon">✅</span>
-                        <span id="selectedFileName">model.pkl</span>
+                        <span id="selectedFileName">model.pt</span>
                     </div>
                 </div>
             </div>
@@ -568,29 +678,27 @@
             <span class="btn-spinner" id="listSpinner"></span>
             <span id="listBtnText">🗂 View Registered Models</span>
         </button>
-
-        <!-- ── Models list panel ──────────────────────────────────────── -->
-        <div class="models-panel hidden" id="modelsPanel">
-            <div class="models-panel-header">
-                <span class="models-panel-title">Registered Models</span>
-                <span class="models-count" id="modelsCount">0</span>
-            </div>
-            <div class="models-table-wrap">
-                <table class="models-table">
-                    <thead>
-                        <tr>
-                            <th>Version</th>
-                            <th>Status</th>
-                            <th>Run ID</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modelsTableBody"></tbody>
-                </table>
-            </div>
-        </div>
-
     </main>
+
+    <!-- ── Models list panel ──────────────────────────────────────── -->
+    <div class="card models-card hidden" id="modelsPanel">
+        <div class="models-panel-header">
+            <span class="models-panel-title">Registered Models</span>
+            <span class="models-count" id="modelsCount">0</span>
+        </div>
+        <div class="models-table-wrap">
+            <table class="models-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Details</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="modelsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
 
 
     <script>
@@ -602,6 +710,67 @@
         const spinner      = document.getElementById('spinner');
         const btnText      = document.getElementById('btnText');
         const resultPanel  = document.getElementById('resultPanel');
+
+        // Initial setup calls
+        fetchArchitectures();
+
+        // ── Form dynamic interactions ──────────────────────────────────────
+
+        document.getElementById('architecture').addEventListener('change', (e) => {
+            const newArchInput = document.getElementById('new_architecture');
+            if (e.target.value === '__ADD_NEW__') {
+                newArchInput.style.display = 'block';
+                newArchInput.required = true;
+            } else {
+                newArchInput.style.display = 'none';
+                newArchInput.required = false;
+            }
+        });
+
+        const COMPATIBILITY_RULES = {
+            'Speech': ['Cloud App', 'Edge Device'],
+            'NER': ['Cloud App'],
+            'File Classifier': ['Dashboard', 'Cloud App']
+        };
+
+        const modelTypeSelect = document.getElementById('model_type');
+        const dpContainer = document.getElementById('deployment_points_container');
+        const dpList = document.getElementById('deployment_points_list');
+
+        modelTypeSelect.addEventListener('change', () => {
+            const selected = modelTypeSelect.value;
+            dpList.innerHTML = '';
+            if (selected && COMPATIBILITY_RULES[selected]) {
+                dpContainer.style.display = 'block';
+                COMPATIBILITY_RULES[selected].forEach(dp => {
+                    dpList.innerHTML += `<label class="checkbox-label"><input type="checkbox" name="deployment_points" value="${dp}"> ${dp}</label>`;
+                });
+            } else {
+                dpContainer.style.display = 'none';
+            }
+        });
+
+        function fetchArchitectures() {
+            fetch('/api/architectures/')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.architectures) {
+                        const archSelect = document.getElementById('architecture');
+                        archSelect.innerHTML = `
+                            <option value="">Select...</option>
+                            <option value="__ADD_NEW__">+ Add New Architecture</option>
+                        `;
+                        data.architectures.forEach(arch => {
+                            if (arch) {
+                                const opt = document.createElement('option');
+                                opt.value = arch;
+                                opt.textContent = arch;
+                                archSelect.appendChild(opt);
+                            }
+                        });
+                    }
+                });
+        }
 
         // ── Drag-and-drop visual feedback ─────────────────────────────────
 
@@ -622,7 +791,6 @@
         dropZone.addEventListener('drop', e => {
             const files = e.dataTransfer.files;
             if (files.length > 0) {
-                // Attach dropped file to the real input via DataTransfer
                 const dt = new DataTransfer();
                 dt.items.add(files[0]);
                 fileInput.files = dt.files;
@@ -648,13 +816,12 @@
 
             const modelName = document.getElementById('modelNameInput').value.trim();
 
-            // Client-side guard
             if (!modelName) {
                 showError('Please enter a model name.');
                 return;
             }
             if (!fileInput.files || fileInput.files.length === 0) {
-                showError('Please select a .pkl file to upload.');
+                showError('Please select a model file to upload.');
                 return;
             }
 
@@ -662,6 +829,13 @@
             resultPanel.classList.add('hidden');
 
             const formData = new FormData(form);
+            
+            // Fix architecture logic
+            let archValue = document.getElementById('architecture').value;
+            if (archValue === '__ADD_NEW__') {
+                archValue = document.getElementById('new_architecture').value;
+            }
+            formData.set('architecture', archValue);
 
             try {
                 const response = await fetch('/api/models/register/', {
@@ -673,6 +847,12 @@
 
                 if (data.success) {
                     showSuccess(data);
+                    form.reset();
+                    dropZone.classList.remove('has-file');
+                    fetchArchitectures();
+                    if (!modelsPanel.classList.contains('hidden')) {
+                        loadModels(); // Refresh list if open
+                    }
                 } else {
                     showError(data.error || 'An unknown error occurred.');
                 }
@@ -710,11 +890,7 @@
                         </div>
                         <div class="info-row">
                             <span class="info-label">Run ID</span>
-                            <span class="info-value">${escHtml(data.run_id)}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Model URI</span>
-                            <span class="info-value">${escHtml(data.model_uri)}</span>
+                            <span class="info-value" style="font-family:'JetBrains Mono'">${escHtml(data.run_id)}</span>
                         </div>
                     </div>
                 </div>
@@ -735,7 +911,6 @@
             resultPanel.classList.remove('hidden');
         }
 
-        // Basic HTML escape to prevent XSS from server response values
         function escHtml(str) {
             return String(str)
                 .replace(/&/g, '&amp;')
@@ -744,7 +919,6 @@
                 .replace(/"/g, '&quot;');
         }
 
-        // Safe JSON parser — returns a friendly error if the server sends HTML instead of JSON
         async function safeJson(response) {
             const ct = response.headers.get('content-type') || '';
             if (!ct.includes('application/json')) {
@@ -754,7 +928,7 @@
             return response.json();
         }
 
-        // ── View Registered Models ─────────────────────────────────────────
+        // ── View & Delete Models ──────────────────────────────────────────
 
         const listModelsBtn  = document.getElementById('listModelsBtn');
         const listSpinner    = document.getElementById('listSpinner');
@@ -763,9 +937,8 @@
         const modelsCount    = document.getElementById('modelsCount');
         const modelsTableBody = document.getElementById('modelsTableBody');
 
-        listModelsBtn.addEventListener('click', async function () {
+        async function loadModels() {
             setListLoading(true);
-
             try {
                 const response = await fetch('/api/models/');
                 const data = await safeJson(response);
@@ -777,14 +950,15 @@
                 }
 
                 renderModelsTable(data.models);
-
             } catch (err) {
                 showError(`Network error: ${err.message}`);
                 modelsPanel.classList.add('hidden');
             } finally {
                 setListLoading(false);
             }
-        });
+        }
+
+        listModelsBtn.addEventListener('click', loadModels);
 
         function setListLoading(loading) {
             listModelsBtn.disabled = loading;
@@ -793,13 +967,12 @@
         }
 
         function renderModelsTable(models) {
-            // Count total unique model names
             modelsCount.textContent = models.length;
             modelsTableBody.innerHTML = '';
 
             if (models.length === 0) {
                 modelsTableBody.innerHTML = `
-                    <tr><td colspan="4" class="empty-state">No models registered yet.</td></tr>
+                    <tr><td colspan="3" class="empty-state">No models registered yet.</td></tr>
                 `;
                 modelsPanel.classList.remove('hidden');
                 return;
@@ -808,45 +981,56 @@
             for (const model of models) {
                 const versions = model.all_versions;
 
-                // Group header row — spans full width with the model name
                 const groupRow = document.createElement('tr');
                 groupRow.innerHTML = `
-                    <td colspan="4" style="
+                    <td colspan="3" style="
                         background: rgba(99,179,237,0.06);
                         border-bottom: 1px solid rgba(99,179,237,0.15);
                         border-top: 1px solid rgba(99,179,237,0.15);
                         padding: 8px 14px;
                         font-family: inherit;
-                        font-size: 12px;
+                        font-size: 14px;
                         font-weight: 600;
                         color: var(--accent-blue);
-                        letter-spacing: 0.04em;
-                    ">📦 ${escHtml(model.name)} <span style="font-weight:400;color:var(--text-muted);">(${versions.length} version${versions.length !== 1 ? 's' : ''})</span></td>
+                    ">📦 ${escHtml(model.name)}</td>
                 `;
                 modelsTableBody.appendChild(groupRow);
 
                 if (versions.length === 0) {
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>—</td><td>—</td><td>—</td><td>—</td>
-                    `;
+                    row.innerHTML = `<td>—</td><td>—</td><td>—</td>`;
                     modelsTableBody.appendChild(row);
                 } else {
-                    // One row per version — newest first (already sorted by service)
                     for (const v of versions) {
                         const isLatest = v.version === versions[0].version;
-                        const createdDate = v.creation_timestamp
-                            ? new Date(v.creation_timestamp).toLocaleString()
-                            : '—';
+                        const createdDate = v.creation_timestamp ? new Date(v.creation_timestamp).toLocaleString() : '—';
+                        
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td style="white-space: nowrap;">
-                                <span class="version-badge">v${escHtml(String(v.version))}</span>
-                                ${isLatest ? '<span style="margin-left:6px;font-size:10px;color:var(--accent-green);font-family:inherit;font-weight:600;">LATEST</span>' : ''}
+                            <td style="white-space: nowrap; vertical-align: top;">
+                                <div style="margin-bottom:6px;">
+                                    <span class="version-badge">v${escHtml(String(v.version))}</span>
+                                    ${isLatest ? '<span style="margin-left:6px;font-size:10px;color:var(--accent-green);font-family:inherit;font-weight:600;">LATEST</span>' : ''}
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted); font-family:inherit;">
+                                    Size: ${escHtml(v.formatted_size)}
+                                </div>
                             </td>
-                            <td style="color:var(--text-secondary);font-family:inherit;">${escHtml(v.status)}</td>
-                            <td>${escHtml(v.run_id || '—')}</td>
-                            <td style="color:var(--text-muted);font-family:inherit;font-size:11px;">${escHtml(createdDate)}</td>
+                            <td>
+                                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                                    <div><strong style="color:var(--text-secondary);">Type:</strong> ${escHtml(v.model_type)}</div>
+                                    <div><strong style="color:var(--text-secondary);">Arch:</strong> ${escHtml(v.architecture || '-')}</div>
+                                    <div><strong style="color:var(--text-secondary);">Acc:</strong> ${escHtml(v.accuracy)}</div>
+                                    <div><strong style="color:var(--text-secondary);">Format:</strong> ${escHtml(v.framework)}</div>
+                                </div>
+                                <div style="font-size:11px; color:var(--text-muted);">
+                                    Deployable: ${v.is_deployable ? 'Yes' : 'No'} <br>
+                                    Points: ${(v.deployment_points && v.deployment_points.length > 0) ? escHtml(v.deployment_points.join(', ')) : '-'}
+                                </div>
+                            </td>
+                            <td style="vertical-align: middle; text-align: right;">
+                                <button class="btn-danger" onclick="deleteModelVersion('${escHtml(model.name)}', ${v.version}, ${v.db_id})">Delete</button>
+                            </td>
                         `;
                         modelsTableBody.appendChild(row);
                     }
@@ -855,7 +1039,27 @@
 
             modelsPanel.classList.remove('hidden');
         }
-    </script>
 
+        async function deleteModelVersion(name, version, db_id) {
+            if (!confirm(`Are you sure you want to delete ${name} v${version}?`)) return;
+            
+            try {
+                const res = await fetch(`/api/models/${name}/version/${version}/`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ db_id: db_id })
+                });
+                const data = await safeJson(res);
+                if (data.success) {
+                    alert('Success: ' + data.message);
+                    loadModels();
+                } else {
+                    alert('Failed to delete: ' + data.error);
+                }
+            } catch (err) {
+                alert('Deletion failed: ' + err);
+            }
+        }
+    </script>
 </body>
 </html>
